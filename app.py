@@ -14,10 +14,7 @@ app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
 # Configure CS50 Library to use SQLite database
-#db = SQL("sqlite:///database.db")
-
-# db = SQL(os.getenv("DATABASE_URL", "sqlite:///database.db"))
-db = SQL(os.getenv("DATABASE_URL", "postgres://nhngizgvgqktgi:a462f77be7d2bad8d6678b6e5fd696b68b24d4975d9d0da8aa163d40796bf0e2@ec2-107-21-67-46.compute-1.amazonaws.com:5432/db5ak4o2g9ht5"))
+db = SQL("sqlite:///database.db")
 
 @app.after_request
 def after_request(response):
@@ -45,6 +42,47 @@ def index():
 
     notes = db.execute("SELECT * FROM notes WHERE user_id = ?", user_id)
     return render_template("index.html", notes=notes)
+
+@app.route("/sign-up", methods=["GET", "POST"])
+def sign_up():
+    # Forget any user_id
+    session.clear()
+
+    if request.method == "POST":
+        email = request.form.get("email")
+        first_name = request.form.get("first_name")
+        password = request.form.get("password")
+        confirmation = request.form.get("confirmation")
+
+        if len(email) < 4:
+            flash("Email must be greater than 3 characters.", category="error")
+        elif len(first_name) < 2:
+            flash("First name must be greater than 1 character.", category="error")
+        elif password != confirmation:
+            flash("Passwords don't match.", category="error")
+        elif len(confirmation) < 7:
+            flash("Password must be at least 7 characters.", category="error")
+        else:
+            # Check if the email already exists in the database
+            rows = db.execute("SELECT * FROM users WHERE email = ?", email)
+
+            if len(rows) > 0:
+                flash(
+                    "Email already exists! Enter a different email address.",
+                    category="error",
+                )
+            else:
+                hashed_password = generate_password_hash(password)
+                db.execute(
+                    "INSERT INTO users (email, password, first_name) VALUES (?, ?, ?)",
+                    email,
+                    hashed_password,
+                    first_name,
+                )
+                flash("Account created!", category="success")
+                return redirect("/")
+
+    return render_template("sign_up.html")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -93,48 +131,6 @@ def logout():
 
     # Redirect user to login form
     return redirect("/")
-
-
-@app.route("/sign-up", methods=["GET", "POST"])
-def sign_up():
-    # Forget any user_id
-    session.clear()
-
-    if request.method == "POST":
-        email = request.form.get("email")
-        first_name = request.form.get("first_name")
-        password = request.form.get("password")
-        confirmation = request.form.get("confirmation")
-
-        if len(email) < 4:
-            flash("Email must be greater than 3 characters.", category="error")
-        elif len(first_name) < 2:
-            flash("First name must be greater than 1 character.", category="error")
-        elif password != confirmation:
-            flash("Passwords don't match.", category="error")
-        elif len(confirmation) < 7:
-            flash("Password must be at least 7 characters.", category="error")
-        else:
-            # Check if the email already exists in the database
-            rows = db.execute("SELECT * FROM users WHERE email = ?", email)
-
-            if len(rows) > 0:
-                flash(
-                    "Email already exists! Enter a different email address.",
-                    category="error",
-                )
-            else:
-                hashed_password = generate_password_hash(password)
-                db.execute(
-                    "INSERT INTO users (email, password, first_name) VALUES (?, ?, ?)",
-                    email,
-                    hashed_password,
-                    first_name,
-                )
-                flash("Account created!", category="success")
-                return redirect("/")
-
-    return render_template("sign_up.html")
 
 
 @app.route("/delete", methods=["POST"])
